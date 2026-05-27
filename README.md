@@ -56,7 +56,7 @@ Se diseñaron visualizaciones orientadas a tomadores de decisión, incluyendo ma
 
 Actualmente el proyecto se encuentra en una fase de Prototipo Analítico Avanzado o MVP científico-técnico. La arquitectura principal de integración, limpieza, auditoría y estructuración territorial ya fue validada mediante pipelines reproducibles. Aunque la plataforma aún no se encuentra desplegada operativamente, el sistema cuenta con bases metodológicas sólidas para escalamiento hacia dashboards interactivos, modelos predictivos y despliegue productivo.
 
-# 6. Arquitectura General
+# 6. Metodología
 
 La siguiente arquitectura resume el flujo metodológico del proyecto desde la adquisición de datos abiertos oficiales hasta el apoyo a decisiones públicas mediante modelamiento espacio-temporal y visualización analítica.
 
@@ -72,16 +72,9 @@ El proyecto fue desarrollado principalmente utilizando R y RMarkdown como base d
 
 # 8. Estructura del Proyecto
 
-data2ai_latam_col-uruguay/
-│
-├── db/                  # Bases de datos originales y procesadas
-├── diapositivas/        # Presentaciones del proyecto
-├── Rmd/                 # Reportes técnicos y análisis reproducibles
-├── renv/                # Entorno reproducible de R
-├── .gitignore
-├── renv.lock
-├── Data2AI_LATAM.Rproj
-└── registro_abreviaturas.csv
+<p align="center">
+  <img src="diapositivas/arquitectura1.png" width="850">
+</p>
 
 # 9. Fortalezas del Proyecto
 
