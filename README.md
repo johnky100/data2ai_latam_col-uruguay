@@ -94,8 +94,8 @@ Actualmente el proyecto corresponde a un Prototipo Analítico Avanzado o MVP cie
 
 # 13. Autor
 
-John Jairo Prado Piñeres, Maestría en Estadística Aplicada y Ciencia de Datos, Universidad El Bosque.
+John Jairo Prado, Maestría en Estadística Aplicada y Ciencia de Datos, Universidad El Bosque.
 
-15. Referencias Técnicas
+# 15. Referencias Técnicas
 
 Los procesos metodológicos y pipelines utilizados en el proyecto fueron documentados mediante reportes técnicos reproducibles relacionados con inventarios nacionales de emisiones atmosféricas, factores de emisión, gases de efecto invernadero y contaminantes criterio.
