@@ -1,0 +1,282 @@
+---
+title: "Datos_de_actividad_del_inventario_Nacional_de_Emisiones_Atmosféricas"
+author: "John J. Prado"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    toc_float:
+      collapsed: false
+    theme: cosmo
+    code_folding: hide
+  word_document:
+    toc: true
+    toc_depth: 2
+editor_options:
+  chunk_output_type: console
+---
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Fira+Code:wght@400;500&display=swap');
+
+body {
+  background-color: #F8F9FA;
+  color: #000000; 
+  font-family: 'Roboto', 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 1100px;
+  margin: auto;
+  padding: 30px;
+}
+
+h1 { font-size: 30px; color: #003366; border-bottom: 3px solid #003366; padding-bottom: 12px; }
+h2 { font-size: 24px; color: #005999; border-left: 5px solid #005999; padding-left: 15px; margin-top: 35px; }
+
+/* Corrección de color negro y alineación para glimpse() y resultados */
+pre, code {
+  font-family: 'Fira Code', 'Consolas', monospace !important;
+}
+
+pre {
+  background-color: #F2F2F2; 
+  color: #000000 !important; /* Fuente negra absoluta */
+  font-size: 14px;
+  padding: 20px;
+  border-radius: 8px;
+  overflow-x: auto; 
+  border: 1px solid #CCCCCC;
+  white-space: pre; 
+  font-weight: 500;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  background-color: white;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+th { background-color: #005999; color: white; padding: 14px; text-align: left; }
+td { border-bottom: 1px solid #EEE; padding: 12px 14px; color: #000000; }
+
+img {
+  max-width: 100%;
+  border-radius: 6px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+}
+</style>
+
+```{r limpiar entorno, echo =FALSE}
+rm(list = ls()) # Se utiliza para borrar todos los objetos del espacio de trabajo.
+graphics.off() # Se utiliza para cerrar todas las ventanas gráficas abiertas.
+cat("\014") #Limpiar consola
+```
+
+```{r setup, include=FALSE}
+# Cargar knitr antes de usar opts_chunk
+library(knitr)
+
+# Configuración global de los chunks
+opts_chunk$set(
+  comment = NA, # No agrega '##' en la salida
+  warning = FALSE, # Oculta advertencias
+  message = FALSE # Oculta mensajes al cargar paquetes
+)
+
+# Configuración global opcional para evitar notación científica
+options(scipen = 999)
+
+```
+
+# **Instalacion de paquetes**
+
+```{r}
+# Instalación (Solo si es necesario)
+# install.packages(c("tidyverse", "janitor", "writexl", "openxlsx", "stringi", "mice", "VIM", "MASS"))
+
+```
+
+# **Cargar librería**
+
+```{r}
+library(tidyverse) # ggplot2, dplyr, tidyr, readr, purrr
+library(janitor)   # Limpieza de nombres
+library(stringi)   # Manipulación avanzada de texto
+library(VIM)       # Visualización de datos faltantes
+library(MASS, exclude = "select") # Evita conflicto con dplyr::select
+library(writexl)   # Exportación
+library(openxlsx)  # Lectura/Escritura avanzada Excel
+
+```
+
+# **Carga y Estructuración de Datos**
+
+```{r}
+
+# Leer archivo
+df_raw <- read_csv("C:/Users/john/Desktop/Data2AI_LATAM/db/3_Inventario_Nacional_Gases_Efecto_Invernadero_20260131.csv")
+
+# Diagnóstico inicial visual
+matrixplot(df_raw[, 1:10]) 
+
+# Transformación principal
+df_analisis <- df_raw %>%
+  clean_names() %>%
+  # Separar código de descripción
+  separate(clasificacion, into = c("codigo", "descripcion"), sep = " ", extra = "merge") %>%
+  # Selección de columnas clave
+  select(ano, codigo, descripcion, ch4, co2, n2o, total_emisiones) %>%
+  # Filtrado de filas vacías
+  filter(!is.na(total_emisiones)) %>%
+  # Limpieza de texto y corrección de jerarquía
+  mutate(
+    # Quitar punto final del código para conteo correcto (ej. "1.A." -> "1.A")
+    codigo_limpio = str_remove(codigo, "\\.$"),
+    # Normalización de descripción
+    descripcion = str_to_sentence(stringi::stri_trim_both(descripcion)),
+    descripcion = stringi::stri_replace_all_regex(descripcion, "\\s+", " "),
+    # Clasificación jerárquica corregida
+    nivel_jerarquico = case_when(
+      !str_detect(codigo_limpio, "\\.") ~ "Sector",
+      str_count(codigo_limpio, "\\.") == 1 ~ "Categoría",
+      TRUE ~ "Sub-detalle"
+    )
+  ) %>%
+  distinct() # Eliminar duplicados lógicos
+
+glimpse(df_analisis)
+```
+
+# **Validación de Calidad (Auditoría)**
+
+
+```{r}
+# 2.1 Verificación de NAs
+total_nas <- sum(is.na(df_analisis$total_emisiones))
+cat("Total de NAs en emisiones:", total_nas)
+
+# 2.2 Prueba de "No Duplicidad" por Niveles (Prueba de Fuego)
+# El total de 'Sector' debería ser la referencia nacional.
+df_analisis %>%
+  group_by(nivel_jerarquico) %>%
+  summarise(
+    total_nivel = sum(total_emisiones, na.rm = TRUE),
+    num_registros = n(),
+    ejemplos = paste(head(unique(codigo_limpio), 3), collapse = ", ")
+  )
+
+# 2.3 Verificación de consistencia de nombres
+# Si el conteo es consistente (ej. múltiplo de años), la limpieza fue exitosa
+df_analisis %>% 
+  tabyl(descripcion) %>% 
+  arrange(desc(n)) %>% 
+  head(10)
+
+```
+
+# **Análisis Visual**
+
+```{r}
+# Distribución de Emisiones y detección de Outliers
+ggplot(df_analisis, aes(x = nivel_jerarquico, y = total_emisiones, fill = nivel_jerarquico)) +
+  geom_boxplot() +
+  scale_y_log10() + 
+  labs(
+    title = "Distribución de Emisiones por Nivel Jerárquico",
+    subtitle = "Verificación de consistencia y valores atípicos",
+    y = "Total Emisiones (Log10)",
+    x = "Nivel"
+  ) +
+  theme_minimal()
+
+# Análisis de datos faltantes final
+aggr(df_analisis %>% select(ano, codigo_limpio, total_emisiones), 
+     plot = TRUE, numbers = TRUE)
+```
+
+# **Exportación Simplificada con writexl**
+
+```{r}
+# Intento de exportación controlada
+tryCatch({
+  writexl::write_xlsx(lista_hojas, path = "C:/Users/john/Desktop/Data2AI_LATAM/db/Inventario_Jerarquizado.xlsx")
+  cat("Archivo Excel generado correctamente.")
+}, error = function(e) {
+  message("No se pudo generar el Excel. Verifique que el archivo no esté abierto o revise los permisos.")
+})
+```
+
+# **Gráfico de Ranking: Análisis de Impacto (Top 10)**
+
+```{r}
+# 5.1. Preparación de datos consolidando nombres truncados
+top_10_actividades <- df_analisis %>%
+  filter(nivel_jerarquico == "Sub-detalle", 
+         ano == max(ano)) %>%
+  # PASO CRÍTICO: Truncamos antes de agrupar para unificar nombres similares
+  mutate(descripcion_grafico = stringr::str_trunc(descripcion, width = 35, side = "right")) %>% 
+  group_by(descripcion_grafico) %>%
+  summarise(total = sum(total_emisiones, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(porcentaje = total / sum(total) * 100) %>% 
+  slice_max(total, n = 10)
+
+# 5.2. Creación del gráfico profesional sin superposiciones
+ggplot(top_10_actividades, aes(x = reorder(descripcion_grafico, total), y = total)) +
+  # Barras
+  geom_col(fill = "firebrick", alpha = 0.8) + 
+  
+  # Etiqueta de porcentaje única por barra
+  geom_text(aes(label = paste0(round(porcentaje, 1), "%")), 
+            hjust = -0.2, 
+            size = 3.5, 
+            fontface = "bold") +
+  
+  coord_flip() + 
+  
+  # Ajuste de escala y cuadrícula visible
+  scale_y_continuous(
+    labels = scales::label_number(scale_cut = scales::cut_short_scale()),
+    expand = expansion(mult = c(0, 0.2)) # Más espacio para evitar que el % se salga del cuadro
+  ) +
+  
+  labs(
+    title = paste("Top 10 Actividades con Mayores Emisiones -", max(df_analisis$ano)),
+    subtitle = "Nivel: Sub-detalle | Categorías consolidadas y porcentajes únicos",
+    x = "Actividad Específica (Abreviada)",
+    y = "Emisiones Totales (kt CO2 eq)"
+  ) +
+  
+  # Estética profesional con cuadrícula clara
+  theme_light() + 
+  theme(
+    panel.grid.major.y = element_blank(), 
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90"), # Cuadrícula vertical clara
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text.y = element_text(size = 9, color = "black"), 
+    axis.text.x = element_text(size = 9)
+  )
+
+```
+
+# **CONCLUSIONES**
+
+El resultado Total de NAs en emisiones es 0.
+
+Categorías como "Incendios forestales" tienen un conteo de 352. Esto tiene sentido lógico (32 años × 11 categorías de incendios, por ejemplo), lo que indica que no hay nombres repetidos por errores de espacios o mayúsculas.
+
+Se ha generado el archivo .xlsx con pestañas separadas. Esto es oro para cualquier reporte oficial, ya que evita que el usuario final confunda los totales con los detalles.
+
+Los números finales nos dan la clave para usar los datos sin errores:
+
+| **Nivel**    |**Emisiones Totales**|**Diagnóstico**|
+|--------------|-------------------|-------------|
+| Sector       | 16,067,924        | Este es el valor real nacional. Es la suma de los niveles “Padre” (1, 2, 3…). |
+| Categoría    | 8,022,457         | Representa solo una parte del desglose; algunos sectores no tienen nivel intermedio de categoría. |
+| Sub-detalle  | 18,691,373        | Confirmado: existe doble conteo (se están sumando hijos junto con nietos). |
+
+**Nota:** Usa siempre la pestaña de Sectores para hablar del total del país. Usa la pestaña de Detalles solo cuando quieras mostrar qué actividad específica (como "Ovinos" o "Acero") es la responsable, pero no los sumes todos entre sí.

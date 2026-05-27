@@ -1,0 +1,15 @@
+abreviatura,columna,significado,tipo
+NA_APL,Varias,No Aplica,Control de nulos
+NA_REP,region,No Reportado,Control de nulos
+MINENERGIA,cartera,Ministerio de Minas y Energía,Institucional
+UPME,entidad,Unidad de Planeación Minero Energética,Institucional
+FECOC 2016,instrumento,Factor de Emisión de Combustión (2016),Metodológico
+FEC_FUNAFUE102,fuente_especifica,Fuente técnica FUNAFUE código 102,Fuente técnica
+1. ENERGIA,sector_ipcc,Sector IPCC Energía,Clasificación IPCC
+1_1AQC,categoria,Quema de combustibles,Clasificación IPCC
+1_11IE,subcategoria1,Industrias de la energía,Clasificación IPCC
+1_11PEPCCAP,subcategoria2,Producción de electricidad,Clasificación IPCC
+1_11IGE,subcategoria3,Generación eléctrica,Clasificación IPCC
+CON_CCGE,nombre_factor,Consumo de combustible en generación eléctrica,Variable técnica
+KG CO2/TJ,unidad_f,Kilogramos de CO2 por terajulio,Unidad
+CO2,contaminante,Dióxido de carbono,Contaminante

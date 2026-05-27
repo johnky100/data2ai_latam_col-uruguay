@@ -1,0 +1,759 @@
+---
+title: "4. Inventario Nacional de Contaminantes Criterio y Carbono Negro"
+author: "John J. Prado"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    toc_float:
+      collapsed: false
+    theme: cosmo
+    code_folding: hide
+  word_document:
+    toc: true
+    toc_depth: 2
+editor_options:
+  chunk_output_type: console
+---
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Fira+Code:wght@400;500&display=swap');
+
+body {
+  background-color: #F8F9FA;
+  color: #000000; 
+  font-family: 'Roboto', 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 1100px;
+  margin: auto;
+  padding: 30px;
+}
+
+h1 { font-size: 30px; color: #003366; border-bottom: 3px solid #003366; padding-bottom: 12px; }
+h2 { font-size: 24px; color: #005999; border-left: 5px solid #005999; padding-left: 15px; margin-top: 35px; }
+
+/* Corrección de color negro y alineación para glimpse() y resultados */
+pre, code {
+  font-family: 'Fira Code', 'Consolas', monospace !important;
+}
+
+pre {
+  background-color: #F2F2F2; 
+  color: #000000 !important; /* Fuente negra absoluta */
+  font-size: 14px;
+  padding: 20px;
+  border-radius: 8px;
+  overflow-x: auto; 
+  border: 1px solid #CCCCCC;
+  white-space: pre; 
+  font-weight: 500;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  background-color: white;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+th { background-color: #005999; color: white; padding: 14px; text-align: left; }
+td { border-bottom: 1px solid #EEE; padding: 12px 14px; color: #000000; }
+
+img {
+  max-width: 100%;
+  border-radius: 6px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+}
+</style>
+
+```{r limpiar entorno, echo =FALSE}
+rm(list = ls()) # Se utiliza para borrar todos los objetos del espacio de trabajo.
+graphics.off() # Se utiliza para cerrar todas las ventanas gráficas abiertas.
+cat("\014") #Limpiar consola
+```
+
+```{r setup, include=FALSE}
+# Cargar knitr antes de usar opts_chunk
+library(knitr)
+
+# Configuración global de los chunks
+opts_chunk$set(
+  comment = NA, # No agrega '##' en la salida
+  warning = FALSE, # Oculta advertencias
+  message = FALSE # Oculta mensajes al cargar paquetes
+)
+
+# Configuración global opcional para evitar notación científica
+options(scipen = 999)
+
+```
+
+# **Instalacion de paquetes**
+
+```{r}
+# Instalación (Solo si es necesario)
+# install.packages(c("tidyverse", "janitor", "writexl", "openxlsx", "stringi", "mice", "VIM", "MASS"))
+# install.packages("naniar")
+# análisis, diagnóstico y visualización de valores faltantes (NA)
+# install.packages("stringr")
+# install.packages("readr")
+# install.packages("glue")
+# install.packages("mice", repos = "https://cloud.r-project.org")
+
+```
+
+# **Cargar librería**
+
+```{r}
+library(tidyverse) # ggplot2, dplyr, tidyr, readr, purrr
+library(janitor) # Limpieza de nombres
+library(stringi) # Manipulación avanzada de texto
+library(VIM) # Visualización de datos faltantes
+library(MASS, exclude = "select") # Evita conflicto con dplyr::select
+library(writexl) # Exportación
+library(openxlsx) # Lectura/Escritura avanzada Excel
+library(naniar) # Análisis, diagnóstico y visualización de valores faltantes (NA)
+library(stringr) # limpiar texto (strings) de forma consistente y segura.
+library(readr) # leer archivos de datos (CSV, TXT) de forma rápida y correcta.
+library(glue) # construir textos dinámicos combinando texto + variables.
+library(mice) # Imputar Valores.
+
+```
+
+# **Carga y Estructuración de Datos**
+
+```{r}
+ruta_db4 <- "C:/Users/john/Desktop/Data2AI_LATAM/db/4_Inventario_Nacional_de_Contaminantes_Criterio_y_Carbono_Negro_20260131.csv"
+
+df_raw4 <- readr::read_csv(
+  ruta_db4,
+  locale = readr::locale(encoding = "UTF-8"),
+  show_col_types = FALSE
+)
+
+df4 <- df_raw4 %>%
+  janitor::clean_names()
+
+glimpse(df4)
+names(df4)
+
+```
+
+
+
+
+
+
+
+# **LIMPIEZA NUMÉRICA (valor_f, inc_)**
+
+Detecta formatos tipo:
+
+"74,193,483"  (coma como miles)
+
+"55,539.11"   (coma miles, punto decimal)
+
+```{r}
+to_num_mixed <- function(x) {
+  x <- as.character(x)
+  x <- str_replace_all(x, "\\s+", "")
+  x <- na_if(x, "")
+
+  # Caso: coma + punto → coma = miles
+  x <- ifelse(
+    str_detect(x, ",") & str_detect(x, "\\."),
+    str_replace_all(x, ",", ""),
+    x
+  )
+
+  # Caso: solo coma → coma = miles
+  x <- ifelse(
+    str_detect(x, ",") & !str_detect(x, "\\."),
+    str_replace_all(x, ",", ""),
+    x
+  )
+
+  suppressWarnings(as.numeric(x))
+}
+
+df_clean <- df %>%
+  mutate(
+    valor_f      = to_num_mixed(valor_f),
+    inc_inferior = to_num_mixed(inc_inferior),
+    inc_superior = to_num_mixed(inc_superior)
+  )
+
+```
+
+## **Abreviar valores internos (solo si son largos)**
+
+Normalizamos (mayúsculas, sin tildes).
+
+Generamos abreviatura por siglas + recorte.
+
+Creamos un diccionario por columna para reemplazo consistente.
+
+```{r}
+normalize_key <- function(x) {
+  x %>%
+    as.character() %>%
+    stringi::stri_enc_toutf8(is_unknown_8bit = TRUE) %>%
+    stringi::stri_trans_general("Latin-ASCII") %>%
+    str_squish() %>%
+    str_to_upper()
+}
+
+make_abbrev <- function(x, max_len = 28) {
+  if (is.na(x) || nchar(x) <= max_len) return(x)
+
+  cleaned <- x %>%
+    str_replace_all("[^A-Z0-9 ]", " ") %>%
+    str_squish() %>%
+    str_replace_all(
+      "\\b(DE|DEL|LA|LAS|EL|LOS|Y|EN|PARA|POR|CON|SIN|A|AL)\\b",
+      ""
+    ) %>%
+    str_squish()
+
+  words <- unlist(str_split(cleaned, " "))
+  sigla <- paste0(substr(words, 1, 1), collapse = "")
+  pref  <- substr(words[1], 1, min(3, nchar(words[1])))
+
+  out <- str_squish(paste0(pref, "_", sigla))
+
+  if (nchar(out) < 6) out <- substr(x, 1, max_len)
+  substr(out, 1, max_len)
+}
+
+cols_to_abbrev <- intersect(
+  names(df_clean),
+  c(
+    "region","desagregacion_especifica","cartera","entidad","instrumento",
+    "fuente_especifica","sector_ipcc","categoria",
+    "subcategoria1","subcategoria2","subcategoria3","subcategoria4",
+    "clasificacion1","clasificacion2","clasificacion3",
+    "nombre_factor","nivel","unidad_f","contaminante"
+  )
+)
+
+# Copias claras para auditoría
+df_before <- df_clean
+df_abbrev <- df_clean
+
+abbrev_maps <- list()
+max_len <- 28
+
+for (col in cols_to_abbrev) {
+
+  v_norm <- normalize_key(df_abbrev[[col]])
+  u <- sort(unique(v_norm[!is.na(v_norm)]))
+
+  ab <- purrr::map_chr(u, make_abbrev, max_len = max_len)
+
+  # Resolver colisiones
+  if (any(duplicated(ab))) {
+    for (d in unique(ab[duplicated(ab)])) {
+      idx <- which(ab == d)
+      ab[idx] <- paste0(ab[idx], "_", seq_along(idx))
+      ab[idx] <- substr(ab[idx], 1, max_len)
+    }
+  }
+
+  map_tbl <- tibble(
+    column = col,
+    original_norm = u,
+    abbreviated = ab
+  )
+
+  abbrev_maps[[col]] <- map_tbl
+
+  # Aplicar mapeo
+  m <- setNames(map_tbl$abbreviated, map_tbl$original_norm)
+  x_norm <- normalize_key(df_abbrev[[col]])
+
+  idx <- !is.na(x_norm)
+  mapped <- unname(m[x_norm[idx]])
+
+  df_abbrev[[col]][idx] <- ifelse(
+    is.na(mapped),
+    df_abbrev[[col]][idx],
+    mapped
+  )
+}
+
+dict_abbrev <- bind_rows(abbrev_maps)
+df_after <- df_abbrev
+
+```
+
+## **Resumen por cada columna (auditoría)**
+
+Cuántos cambiaron, NA antes/después, y cuántos quedaron largos.
+
+```{r}
+audit_cols <- intersect(cols_to_abbrev, intersect(names(df_before), names(df_after)))
+
+audit_summary <- purrr::map_dfr(audit_cols, function(col) {
+  before <- as.character(df_before[[col]])
+  after  <- as.character(df_after[[col]])
+
+  tibble(
+    column = col,
+    n_total = length(after),
+    n_na_before = sum(is.na(before)),
+    n_na_after  = sum(is.na(after)),
+    n_changed = sum(!is.na(before) & !is.na(after) & before != after),
+    n_long_before = sum(!is.na(before) & nchar(before) > max_len),
+    n_long_after  = sum(!is.na(after)  & nchar(after)  > max_len)
+  )
+})
+
+audit_summary
+
+audit_summary %>%
+  select(column, n_long_before, n_long_after)
+
+
+```
+
+## **Conclusiones**
+
+El proceso de preparación de datos aplicado al Inventario Nacional de Emisiones Atmosféricas permitió consolidar un conjunto de datos limpio, consistente, trazable y apto para análisis estadístico y modelamiento, sin comprometer la integridad de la información original. A continuación, se presentan las conclusiones principales del procedimiento.
+
+Durante todo el pipeline de procesamiento se conservaron las 226.381 observaciones originales, sin pérdida ni duplicación de registros, además la estructura del dataset (filas y columnas) se mantuvo estable en todas las etapas.
+
+No se introdujeron desalineaciones, errores de indexación ni conflictos de tipos de datos, lo que confirma que el proceso no fue destructivo y respetó la estructura original del inventario.
+
+En el análisis comparativo antes y después del procesamiento se observó que el número de valores faltantes (NA) se mantuvo idéntico por columna, no se generaron valores faltantes adicionales durante la limpieza, normalización o abreviación y no se eliminaron ni reemplazaron valores válidos por error, lo que garantiza que el proceso no alteró la calidad semántica ni la completitud de la información disponible.
+
+La limpieza de texto permitió estandarizar de manera homogénea todos los campos categóricos mediante la corrección de problemas de encoding (UTF-8 / mojibake), la eiminación de tildes y caracteres especiales, unificación de mayúsculas/minúsculas, además de la compactación de espacios y tratamiento explícito de valores vacíos. Esta normalización redujo la ambigüedad semántica y evitó duplicidades causadas por diferencias superficiales de escritura, mejorando la consistencia interna del dataset.
+
+Las variables numéricas críticas (valor_f, inc_inferior, inc_superior) fueron transformadas correctamente desde formatos mixtos de origen (comas como separadores de miles y puntos decimales) hacia valores numéricos homogéneos, sin pérdida de información.
+
+El procedimiento fue reproducible, tolerante a formatos inconsistentes y seguro frente a valores faltantes, lo que habilita el uso directo de estas variables en análisis estadísticos, modelos de incertidumbre y procesos de agregación.
+
+Las columnas con textos extensos (por ejemplo: entidad, sector_ipcc, fuente_especifica, subcategoria*) fueron tratadas mediante un sistema de abreviación inteligente que solo abrevia valores que exceden un umbral máximo de longitud (28 caracteres), utiliza siglas informativas combinadas con prefijos semánticos, elimina conectores no informativos para mejorar legibilidad y aplica un diccionario de reemplazo por columna, garantizando consistencia.
+
+El número de valores largos se redujo de decenas de miles a cero en todas las columnas auditadas, no se produjeron colisiones semánticas (abreviaturas ambiguas) y la información se mantuvo interpretable y trazable.
+
+El proceso generó Un diccionario de abreviaciones, que permite auditar los cambios realizados, revertir el proceso si es necesario y documentar el mapeo original abreviado.
+
+Tras el procesamiento, el conjunto de datos queda plenamente preparado para analisis de nulos por variables, análisis exploratorio y estadístico, modelamiento de emisiones y escenarios y visualización.
+
+# **ANÁLISIS DE NULOS**
+
+```{r}
+# Función de revisión de nulos
+reporte_nulos <- df_after %>%
+  summarise(across(everything(),
+                   ~ sum(is.na(.)),
+                   .names = "nulos_{col}")) %>%
+  pivot_longer(everything(),
+               names_to = "variable",
+               values_to = "nulos") %>%
+  mutate(
+    variable = str_replace(variable, "nulos_", ""),
+    porcentaje = round((nulos / nrow(df_after)) * 100, 2)
+  ) %>%
+  arrange(desc(nulos))   # ← AQUÍ se ordena por cantidad de nulos
+
+options(dplyr.width = Inf)
+options(tibble.print_max = Inf)
+
+# Mostrar resultados
+reporte_nulos
+
+```
+
+## **NA_APL (no aplica / jerárquico)**
+
+En tu dataset, esto aplica muy bien a niveles jerárquicos que “no existen” para ciertas filas:
+
+```{r}
+cols_na_apl <- c(
+  "desagregacion_especifica",
+  "s_2",
+  "sb3", "sb4",
+  "subcategoria4",
+  "clasificacion3",
+  "nivel"
+)
+```
+
+## **NA_REP (no reportado)**
+
+Usa esto cuando el campo normalmente debería existir, pero viene vacío (más “dato faltante real”):
+
+```{r}
+cols_na_rep <- c(
+  "region"
+  # agrega aquí otras si en tu diagnóstico aplica, por ejemplo:
+  # "fuente_especifica", "contaminante"
+)
+
+```
+
+## **Aplicar reemplazo (solo donde hay NA)**
+
+```{r}
+df_after <- df_after %>%
+  mutate(
+    across(all_of(intersect(cols_na_apl, names(df_after))),
+           ~ tidyr::replace_na(as.character(.x), "NA_APL")),
+    across(all_of(intersect(cols_na_rep, names(df_after))),
+           ~ tidyr::replace_na(as.character(.x), "NA_REP"))
+  )
+
+```
+
+## **Análisis de nulos REALES (excluye NA_APL y NA_REP)**
+
+```{r}
+
+reporte_nulos <- df_after %>%
+  summarise(
+    across(
+      everything(),
+      ~ {
+        # NA reales
+        if (is.character(.x)) {
+          sum(is.na(.x))
+        } else {
+          sum(is.na(.x))
+        }
+      },
+      .names = "nulos_{.col}"
+    )
+  ) %>%
+  pivot_longer(
+    everything(),
+    names_to = "variable",
+    values_to = "nulos"
+  ) %>%
+  mutate(
+    variable = str_replace(variable, "nulos_", ""),
+    porcentaje = round((nulos / nrow(df_after)) * 100, 2)
+  ) %>%
+  arrange(desc(nulos))
+
+options(dplyr.width = Inf)
+options(tibble.print_max = Inf)
+
+reporte_nulos
+
+```
+
+## **Definir en qué columnas NO aceptas NA_APL / NA_REP**
+
+Para modelar emisiones, se necesita: categoria, subcategoria1, valor_f, contaminante, ano
+
+```{r}
+cols_clave <- c(
+  "categoria",
+  "subcategoria1",
+  "valor_f",
+  "contaminante",
+  "ano"
+)
+
+```
+
+## **Crear el nuevo df SIN NA_APL / NA_REP**
+
+```{r}
+df_modelo <- df_after %>%
+  filter(
+    across(
+      all_of(cols_clave),
+      ~ !(.x %in% c("NA_APL", "NA_REP") | is.na(.x))
+    )
+  )
+
+```
+
+## **Diagnóstico de pérdida de observaciones por reglas de exclusión**
+
+```{r}
+tibble(
+  filas_originales = nrow(df_after),
+  filas_modelo     = nrow(df_modelo),
+  filas_eliminadas = nrow(df_after) - nrow(df_modelo),
+  porcentaje_perdida = round(
+    (nrow(df_after) - nrow(df_modelo)) / nrow(df_after) * 100, 2
+  )
+)
+
+```
+
+## **Observar los datos perdidos**
+
+```{r}
+df_after %>%
+  mutate(
+    motivo = case_when(
+      contaminante == "NA_REP" ~ "contaminante",
+      region == "NA_REP" ~ "region",
+      categoria == "NA_APL" ~ "categoria",
+      subcategoria1 == "NA_APL" ~ "subcategoria1",
+      TRUE ~ "OK"
+    )
+  ) %>%
+  count(motivo, sort = TRUE)
+
+```
+
+## **Definir columnas a ignorar (regla explícita)**
+
+```{r}
+cols_ignorar <- c(
+  "s", "sb1", "sb4", # codificación jerárquica
+  "s_2", "sb2", "sb3", # etiquetas internas
+  "c",                        # clasificación técnica
+  "inc_inferior", "inc_superior", # incertidumbre incompleta
+  "ano" # índice temporal (no predictor)
+)
+```
+
+## **Crear dataset para modelado (sin esas columnas)**
+
+```{r}
+df_modelo <- df_after %>%
+  dplyr::select(-any_of(cols_ignorar))
+
+```
+
+## **Verificación**
+
+```{r}
+setdiff(cols_ignorar, names(df_modelo))
+
+glimpse(df_modelo)
+```
+
+## **Generar el registro automáticamente en R**
+
+```{r}
+registro_abreviaturas <- tibble::tribble(
+  ~abreviatura, ~columna, ~significado, ~tipo,
+  "NA_APL", "Varias", "No Aplica", "Control de nulos",
+  "NA_REP", "region", "No Reportado", "Control de nulos",
+  "MINENERGIA", "cartera", "Ministerio de Minas y Energía", "Institucional",
+  "UPME", "entidad", "Unidad de Planeación Minero Energética", "Institucional",
+  "FECOC 2016", "instrumento", "Factor de Emisión de Combustión (2016)", "Metodológico",
+  "FEC_FUNAFUE102", "fuente_especifica", "Fuente técnica FUNAFUE código 102", "Fuente técnica",
+  "1. ENERGIA", "sector_ipcc", "Sector IPCC Energía", "Clasificación IPCC",
+  "1_1AQC", "categoria", "Quema de combustibles", "Clasificación IPCC",
+  "1_11IE", "subcategoria1", "Industrias de la energía", "Clasificación IPCC",
+  "1_11PEPCCAP", "subcategoria2", "Producción de electricidad", "Clasificación IPCC",
+  "1_11IGE", "subcategoria3", "Generación eléctrica", "Clasificación IPCC",
+  "CON_CCGE", "nombre_factor", "Consumo de combustible en generación eléctrica", "Variable técnica",
+  "KG CO2/TJ", "unidad_f", "Kilogramos de CO2 por terajulio", "Unidad",
+  "CO2", "contaminante", "Dióxido de carbono", "Contaminante"
+)
+
+```
+
+## **Exportar**
+
+```{r}
+ruta_salida <- "C:/Users/john/Desktop/Data2AI_LATAM/db"
+
+# Guardar como CSV
+readr::write_csv(
+  registro_abreviaturas,
+  file.path(ruta_salida, "registro_abreviaturas.csv")
+)
+
+# Guardar como Excel (.xlsx)
+openxlsx::write.xlsx(
+  registro_abreviaturas,
+  file = file.path(ruta_salida, "registro_abreviaturas.xlsx"),
+  overwrite = TRUE
+)
+
+# Verificación rápida (recomendada)
+list.files(
+  path = ruta_salida,
+  pattern = "registro_abreviaturas",
+  full.names = TRUE
+)
+
+# attr(registro_abreviaturas, "ruta_guardado") <- ruta_salida
+# attr(registro_abreviaturas, "fecha_creacion") <- Sys.Date()
+
+```
+
+# **VARIABLE df_modelo (NO TIENE LAS VARIABLES IGNORADAS**
+
+## **Analisis de nulos**
+
+```{r}
+# Función de revisión de nulos
+reporte_nulos <- df_modelo %>%
+  summarise(across(everything(),
+                   ~ sum(is.na(.)),
+                   .names = "nulos_{col}")) %>%
+  pivot_longer(everything(),
+               names_to = "variable",
+               values_to = "nulos") %>%
+  mutate(
+    variable = str_replace(variable, "nulos_", ""),
+    porcentaje = round((nulos / nrow(df_modelo)) * 100, 2)
+  ) %>%
+  arrange(desc(nulos))   # ← AQUÍ se ordena por cantidad de nulos
+
+options(dplyr.width = Inf)
+options(tibble.print_max = Inf)
+
+# Mostrar resultados
+reporte_nulos
+
+```
+
+## **Conclusiones**
+
+### **Diagnóstico según Rubin (MCAR / MAR / MNAR)**
+
+### **Decisión variable por variable:**
+
+imputar / no imputar / tratar como categoría. Proceso de imputación paso a paso en R (con código claro). Según Rubin (1976), los datos faltantes pueden ser:
+
+### **MCAR (Missing Completely At Random)**
+
+El NA no depende de ninguna variable observada ni no observada. **Se puede eliminar o imputar sin sesgo.**
+
+### **MAR (Missing At Random)**
+
+El NA depende de otras variables observadas. **Imputación válida (regresión, MICE, etc.).**
+
+### **MNAR (Missing Not At Random)**
+
+El NA depende de la variable faltante en sí (información estructural). **NO se debe imputar con valores “inventados”.**
+
+En inventarios ambientales y administrativos, la mayoría de NA son MAR o MNAR, no MCAR.
+
+### **Variables que NO se deben imputar numéricamente**
+
+Son estructurales o administrativas:
+
+| Variable                                      | % NA | Decisión     | Justificación                   |
+| --------------------------------------------- | ---- | ------------ | ------------------------------- |
+| `1_instrumento`                                 | 74.9 | NO imputar | Ausencia estructural (MNAR)     |
+| `4_fuente_especifica`                           | 28.6 | NO imputar | No aplica a todos los registros |
+| `5_subcategoria3`                               | 19.5 | NO imputar | Nivel jerárquico no obligatorio |
+| `7_categoria`, `13_subcategoria1`, `8_subcategoria2` | 7–10 | NO imputar | Estructura IPCC                 |
+| `9_clasificacion1`, `2_clasificacion2`            | 6–36 | NO imputar | Clasificación técnica           |
+| `6_entidad`, `11_cartera`                          | <12  | NO imputar | Administrativas                 |
+
+**Nota:** Se usó No aplica (NA_APL), No reporta (NA_REP) como categorías explícitas.
+
+### **Variables categóricas que se tratan como categoría explícita**
+
+No imputación estadística:
+
+| Variable            | Acción     |
+| ------------------- | ---------- |
+| `1_instrumento`       | `"NA_APL"` |
+| `4_fuente_especifica` | `"NA_APL"` |
+| `2_clasificacion2`    | `"NA_APL"` |
+| `3_contaminante`      | `"NA_REP"` |
+
+### **Variable que SÍ se puede imputar estadísticamente**
+
+| Variable  | % NA | Tipo              | Decisión            |
+| --------- | ---- | ----------------- | ------------------- |
+| `10_valor_f` | 6.55 | Numérica continua | **Imputar (MAR)** |
+
+**valor_f** depende de sector_ipcc, categoria, subcategorías, contaminante, unidad_f
+
+# **IMPUTACION EN R**
+
+## **Separar variables para imputación numérica**
+
+```{r}
+df_imputacion <- df_modelo %>%
+  select(
+    valor_f,
+    sector_ipcc,
+    categoria,
+    subcategoria1,
+    subcategoria2,
+    subcategoria3,
+    contaminante,
+    unidad_f
+  )
+
+```
+
+## **usar paquete MICE**
+
+```{r}
+#library(mice)
+
+# Inicializar
+ini <- mice(df_imputacion, maxit = 0)
+
+# Método: predictive mean matching
+meth <- ini$method
+meth["valor_f"] <- "pmm"
+
+# No imputar categóricas
+meth[names(meth) != "valor_f"] <- ""
+
+# Ejecutar imputación
+imp <- mice(
+  df_imputacion,
+  method = meth,
+  m = 5,
+  maxit = 15,
+  seed = 5477976
+)
+
+```
+
+## **Reemplazar solo valor_f**
+
+```{r}
+df_modelo$valor_f <- complete(imp)$valor_f
+
+```
+
+## **Verificación: ¿Bajaron los NA?**
+
+```{r}
+# Antes de imputar
+sum(is.na(df_before$valor_f))
+
+# Después de imputar
+sum(is.na(df_modelo$valor_f))
+```
+
+# **EXPORTAR df CON EL NOMBRE DE 2_FACTORES_DE_EMISION_CLEAN**
+
+```{r}
+# Exportar a CSV
+
+readr::write_csv(
+  df_modelo,
+  file.path(ruta_salida, "2_Factores_de_emision_clean.csv")
+)
+
+# Exportar a Excel (.xlsx)
+openxlsx::write.xlsx(
+  df_modelo,
+  file = file.path(ruta_salida, "2_Factores_de_emision_clean.xlsx"),
+  overwrite = TRUE
+)
+
+# Verificación
+
+list.files(
+  path = ruta_salida,
+  pattern = "2_Factores_de_emision_clean",
+  full.names = TRUE
+)
+
+```

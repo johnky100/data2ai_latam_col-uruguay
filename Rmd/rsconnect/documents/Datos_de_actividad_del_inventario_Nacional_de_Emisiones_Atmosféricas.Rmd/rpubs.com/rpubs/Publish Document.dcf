@@ -1,0 +1,10 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/1392029/f4c18969ca0a49ddb46da1b1a716ffe7
+bundleId: https://api.rpubs.com/api/v1/document/1392029/f4c18969ca0a49ddb46da1b1a716ffe7
+url: http://rpubs.com/johnky100/1392029
+version: 1
